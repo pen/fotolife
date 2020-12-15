@@ -1,0 +1,19 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: ./cmd/fotolife/main.go
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+      - '-ldflags=-buildid='
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+archives:
+  - format: zip
