@@ -20,10 +20,10 @@ func main() {
 	ctx := kong.Parse(&cli,
 		kong.Name("fotolife"),
 		kong.Description("Hatena Fotolife client"),
-		kong.Vars{"version": version},
 
-		kong.UsageOnMissing(),
+		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
+		kong.Vars{"version": version},
 	)
 
 	ctx.FatalIfErrorf(ctx.Run(&cli.Options))
