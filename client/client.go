@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/remeh/sizedwaitgroup"
+	"golang.org/x/net/context/ctxhttp"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -20,25 +22,25 @@ const (
 )
 
 type Client struct {
-	http *http.Client
+	httpClient *http.Client
 }
 
 func New() *Client {
 	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 
 	return &Client{
-		http: &http.Client{
+		httpClient: &http.Client{
 			Jar: jar,
 		},
 	}
 }
 
-func (c *Client) Login(id, password string) error {
+func (c *Client) Login(ctx context.Context, id, password string) error {
 	v := url.Values{}
 	v.Set("name", id)
 	v.Set("password", password)
 
-	resp, err := c.http.PostForm("https://www.hatena.ne.jp/login", v)
+	resp, err := ctxhttp.PostForm(ctx, c.httpClient, "https://www.hatena.ne.jp/login", v)
 	if err != nil {
 		return err
 	}
@@ -56,8 +58,8 @@ func (c *Client) Login(id, password string) error {
 	return nil
 }
 
-func (c *Client) GetFolders(id string) ([]string, error) {
-	resp, err := c.http.Get(BaseURI + id + "/")
+func (c *Client) GetFolders(ctx context.Context, id string) ([]string, error) {
+	resp, err := ctxhttp.Get(ctx, c.httpClient, BaseURI+id+"/")
 	if err != nil {
 		return nil, err
 	}
@@ -91,13 +93,13 @@ func (c *Client) GetFolders(id string) ([]string, error) {
 	return folders, nil
 }
 
-func (c *Client) GetViews(id string, folder string, para int) ([]string, error) {
+func (c *Client) GetViews(ctx context.Context, id string, folder string, para int) ([]string, error) {
 	uri := BaseURI + id + "/"
 	if folder != "" {
 		uri += folder + "/"
 	}
 
-	views, lastPage, err := c.getViews(uri, 1)
+	views, lastPage, err := c.getViews(ctx, uri, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +121,7 @@ func (c *Client) GetViews(id string, folder string, para int) ([]string, error) 
 		go func(p int) {
 			defer swg.Done()
 
-			moreViews, _, err := c.getViews(uri, p)
+			moreViews, _, err := c.getViews(ctx, uri, p)
 			if err != nil {
 				return
 			}
@@ -134,12 +136,12 @@ func (c *Client) GetViews(id string, folder string, para int) ([]string, error) 
 	return views, nil
 }
 
-func (c *Client) getViews(uri string, page int) ([]string, int, error) {
+func (c *Client) getViews(ctx context.Context, uri string, page int) ([]string, int, error) {
 	if page > 1 {
 		uri += fmt.Sprintf("?page=%d", page)
 	}
 
-	resp, err := c.http.Get(uri)
+	resp, err := ctxhttp.Get(ctx, c.httpClient, uri)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -184,8 +186,8 @@ func (c *Client) getViews(uri string, page int) ([]string, int, error) {
 	return views, lastPage, nil
 }
 
-func (c *Client) GetPhotoURI(id string, view string) (string, error) {
-	resp, err := c.http.Get(BaseURI + id + "/" + view)
+func (c *Client) GetPhotoURI(ctx context.Context, id string, view string) (string, error) {
+	resp, err := ctxhttp.Get(ctx, c.httpClient, BaseURI+id+"/"+view)
 	if err != nil {
 		return "", err
 	}

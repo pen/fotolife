@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,9 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pen/fotolife/client"
-
 	"github.com/remeh/sizedwaitgroup"
+	"golang.org/x/net/context/ctxhttp"
+
+	"github.com/pen/fotolife/client"
 )
 
 //nolint:maligned
@@ -26,6 +28,7 @@ type Dump struct {
 }
 
 func (d *Dump) Run(o *Options) error {
+	ctx := context.Background()
 	c := client.New()
 
 	if o.Password != "" {
@@ -36,17 +39,16 @@ func (d *Dump) Run(o *Options) error {
 
 		o.Debugf("login as %s", id)
 
-		err := c.Login(id, o.Password)
-		if err != nil {
+		if err := c.Login(ctx, id, o.Password); err != nil {
 			return err
 		}
 	}
 
-	return d.processFolders(c, o)
+	return d.processFolders(ctx, c, o)
 }
 
-func (d *Dump) processFolders(c *client.Client, o *Options) error {
-	folders, err := c.GetFolders(d.TargetID)
+func (d *Dump) processFolders(ctx context.Context, c *client.Client, o *Options) error {
+	folders, err := c.GetFolders(ctx, d.TargetID)
 	if err != nil {
 		return err
 	}
@@ -75,7 +77,7 @@ func (d *Dump) processFolders(c *client.Client, o *Options) error {
 	}
 
 	for _, folder := range folders {
-		views, err := c.GetViews(d.TargetID, folder, d.Para)
+		views, err := c.GetViews(ctx, d.TargetID, folder, d.Para)
 		if err != nil {
 			o.Debugf("GetViews(%s): %v", folder, err)
 			continue
@@ -93,13 +95,13 @@ func (d *Dump) processFolders(c *client.Client, o *Options) error {
 			continue
 		}
 
-		d.processViews(views, dir, c, o)
+		d.processViews(ctx, views, dir, c, o)
 	}
 
 	return nil
 }
 
-func (d *Dump) processViews(views []string, dir string, c *client.Client, o *Options) {
+func (d *Dump) processViews(ctx context.Context, views []string, dir string, c *client.Client, o *Options) {
 	para := d.Para
 	if para <= 0 {
 		para = 1
@@ -119,13 +121,13 @@ func (d *Dump) processViews(views []string, dir string, c *client.Client, o *Opt
 		go func(v string) {
 			defer swg.Done()
 
-			uri, err := c.GetPhotoURI(d.TargetID, v)
+			uri, err := c.GetPhotoURI(ctx, d.TargetID, v)
 			if err != nil {
 				o.Debugf("failed to get uri of %s", v)
 				return
 			}
 
-			err = d.download(uri, dir, o)
+			err = d.download(ctx, http.DefaultClient, uri, dir, o)
 			if err != nil {
 				o.Debugf("failed to download: %s %s", dir, uri)
 				return
@@ -157,7 +159,7 @@ func (d *Dump) makeDir(folder string, o *Options) (string, error) {
 		return dir, nil
 	}
 
-	err := os.MkdirAll(dir, 0755)
+	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
 		return "", err
 	}
@@ -165,7 +167,7 @@ func (d *Dump) makeDir(folder string, o *Options) (string, error) {
 	return dir, nil
 }
 
-func (d *Dump) download(uri, dir string, o *Options) error {
+func (d *Dump) download(ctx context.Context, httpClient *http.Client, uri, dir string, o *Options) error {
 	index := strings.LastIndex(uri, "/")
 	if index < 0 {
 		return fmt.Errorf("failed to make filename from uri: %s", uri)
@@ -178,7 +180,7 @@ func (d *Dump) download(uri, dir string, o *Options) error {
 	path := dir + uri[index+1:]
 
 	if d.Update {
-		if d.canSkip(uri, path) {
+		if d.canSkip(ctx, httpClient, uri, path) {
 			o.Debugf("skip: %s", path)
 			return nil
 		}
@@ -190,7 +192,7 @@ func (d *Dump) download(uri, dir string, o *Options) error {
 		return nil
 	}
 
-	resp, err := http.Get(uri) //nolint:gosec
+	resp, err := ctxhttp.Get(ctx, httpClient, uri)
 	if err != nil {
 		return err
 	}
@@ -207,8 +209,8 @@ func (d *Dump) download(uri, dir string, o *Options) error {
 	return err
 }
 
-func (d *Dump) canSkip(uri, path string) bool {
-	resp, err := http.Head(uri) //nolint:gosec
+func (d *Dump) canSkip(ctx context.Context, httpClient *http.Client, uri, path string) bool {
+	resp, err := ctxhttp.Head(ctx, httpClient, uri)
 	if err != nil {
 		return false
 	}
