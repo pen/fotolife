@@ -8,7 +8,7 @@
 ## Install
 
 ```shell
-go get github.com/pen/fotolife/cmd/fotolife
+go install github.com/pen/fotolife/cmd/fotolife@latest
 rehash
 ```
 
