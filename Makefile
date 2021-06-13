@@ -1,5 +1,3 @@
-BINARIES = fotolife
-
 lint:
 	golangci-lint run
 
@@ -9,4 +7,4 @@ test:
 build: $(BINARIES)
 
 fotolife: cmd/fotolife/* internal/cmd/*
-	go build -v -o $@ cmd/fotolife/main.go
+	go build -v -ldflags '-X main.version=0.0.0-localbuild' -o $@ cmd/fotolife/main.go

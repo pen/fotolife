@@ -9,7 +9,6 @@
 
 ```shell
 go install github.com/pen/fotolife/cmd/fotolife@latest
-rehash
 ```
 
 ## Usage

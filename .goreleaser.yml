@@ -10,8 +10,6 @@ builds:
     ldflags:
       - -s
       - -w
-      - -buildid=
-      - -X main.version={{.Version}}
     goos:
       - darwin
       - linux
