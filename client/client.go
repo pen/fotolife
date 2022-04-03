@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -42,17 +41,17 @@ func (c *Client) Login(ctx context.Context, id, password string) error {
 
 	resp, err := ctxhttp.PostForm(ctx, c.httpClient, "https://www.hatena.ne.jp/login", v)
 	if err != nil {
-		return err
+		return fmt.Errorf("on PostForm(): %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return errors.New("failed to post login page")
+		return fmt.Errorf("on PostForm(): status != 200")
 	}
 
 	cookies := resp.Header.Values("Set-Cookie")
 	if len(cookies) == 0 {
-		return errors.New("login failed")
+		return fmt.Errorf("on PostForm(): no cookie")
 	}
 
 	return nil
@@ -61,17 +60,17 @@ func (c *Client) Login(ctx context.Context, id, password string) error {
 func (c *Client) GetFolders(ctx context.Context, id string) ([]string, error) {
 	resp, err := ctxhttp.Get(ctx, c.httpClient, BaseURI+id+"/")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("on Get(): %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, errors.New("failed to get user top page")
+		return nil, fmt.Errorf("on Get(): status = %d", resp.StatusCode)
 	}
 
 	html, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("on NewDocumentFromReader(): %w", err)
 	}
 
 	var folders []string
@@ -143,17 +142,17 @@ func (c *Client) getViews(ctx context.Context, uri string, page int) ([]string, 
 
 	resp, err := ctxhttp.Get(ctx, c.httpClient, uri)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("on Get(): %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, 0, errors.New("failed to get folder top")
+		return nil, 0, fmt.Errorf("on Get(): status = %d", resp.StatusCode)
 	}
 
 	html, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("on NewDocumentFromReader(): %w", err)
 	}
 
 	var lastPage int
@@ -189,24 +188,24 @@ func (c *Client) getViews(ctx context.Context, uri string, page int) ([]string, 
 func (c *Client) GetPhotoURI(ctx context.Context, id string, view string) (string, error) {
 	resp, err := ctxhttp.Get(ctx, c.httpClient, BaseURI+id+"/"+view)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("on Get(): %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", errors.New("failed to get view page")
+		return "", fmt.Errorf("on Get(): status = %d", resp.StatusCode)
 	}
 
 	html, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("on NewDocumentFromReader(): %w", err)
 	}
 
 	img := html.Find("div#foto-body img")
 
 	src, exists := img.Attr("src")
 	if !exists {
-		return "", errors.New("failed to parse view page")
+		return "", fmt.Errorf("on parsing page")
 	}
 
 	return src, nil

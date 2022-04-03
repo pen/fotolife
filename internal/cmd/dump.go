@@ -40,7 +40,7 @@ func (d *Dump) Run(o *Options) error {
 		o.Debugf("login as %s", id)
 
 		if err := c.Login(ctx, id, o.Password); err != nil {
-			return err
+			return fmt.Errorf("on Login(): %w", err)
 		}
 	}
 
@@ -50,7 +50,7 @@ func (d *Dump) Run(o *Options) error {
 func (d *Dump) processFolders(ctx context.Context, c *client.Client, o *Options) error {
 	folders, err := c.GetFolders(ctx, d.TargetID)
 	if err != nil {
-		return err
+		return fmt.Errorf("on GetFolders(): %w", err)
 	}
 
 	o.Debugf("remote folders(%d): %v", len(folders), folders)
@@ -159,9 +159,8 @@ func (d *Dump) makeDir(folder string, o *Options) (string, error) {
 		return dir, nil
 	}
 
-	err := os.MkdirAll(dir, 0o755)
-	if err != nil {
-		return "", err
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("on MkdirAll(): %w", err)
 	}
 
 	return dir, nil
@@ -170,7 +169,7 @@ func (d *Dump) makeDir(folder string, o *Options) (string, error) {
 func (d *Dump) download(ctx context.Context, httpClient *http.Client, uri, dir string, o *Options) error {
 	index := strings.LastIndex(uri, "/")
 	if index < 0 {
-		return fmt.Errorf("failed to make filename from uri: %s", uri)
+		return fmt.Errorf("on making filename from uri: %s", uri)
 	}
 
 	if dir != "" && !strings.HasSuffix(dir, "/") {
@@ -194,19 +193,21 @@ func (d *Dump) download(ctx context.Context, httpClient *http.Client, uri, dir s
 
 	resp, err := ctxhttp.Get(ctx, httpClient, uri)
 	if err != nil {
-		return err
+		return fmt.Errorf("on Get(): %w", err)
 	}
 	defer resp.Body.Close()
 
 	out, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("on Create(): %w", err)
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		return fmt.Errorf("on Copy(): %w", err)
+	}
 
-	return err
+	return nil
 }
 
 func (d *Dump) canSkip(ctx context.Context, httpClient *http.Client, uri, path string) bool {
