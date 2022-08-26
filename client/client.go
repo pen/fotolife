@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/remeh/sizedwaitgroup"
+	"github.com/jesse0michael/errgroup"
 	"golang.org/x/net/context/ctxhttp"
 	"golang.org/x/net/publicsuffix"
 )
@@ -45,7 +45,7 @@ func (c *Client) Login(ctx context.Context, id, password string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("on PostForm(): status != 200")
 	}
 
@@ -64,7 +64,7 @@ func (c *Client) GetFolders(ctx context.Context, id string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("on Get(): status = %d", resp.StatusCode)
 	}
 
@@ -111,26 +111,29 @@ func (c *Client) GetViews(ctx context.Context, id string, folder string, para in
 		para = 5
 	}
 
-	swg := sizedwaitgroup.New(para)
+	eg, egCtx := errgroup.WithContext(ctx, para)
 	mutex := sync.Mutex{}
 
 	for page := 2; page <= lastPage; page++ {
-		swg.Add()
+		page := page
 
-		go func(p int) {
-			defer swg.Done()
-
-			moreViews, _, err := c.getViews(ctx, uri, p)
+		eg.Go(func() error {
+			moreViews, _, err := c.getViews(egCtx, uri, page)
 			if err != nil {
-				return
+				return err
 			}
 
 			mutex.Lock()
 			views = append(views, moreViews...)
 			mutex.Unlock()
-		}(page)
+
+			return nil
+		})
 	}
-	swg.Wait()
+
+	if err := eg.Wait(); err != nil {
+		return nil, fmt.Errorf("on goroutine: %w", err)
+	}
 
 	return views, nil
 }
@@ -146,7 +149,7 @@ func (c *Client) getViews(ctx context.Context, uri string, page int) ([]string, 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, 0, fmt.Errorf("on Get(): status = %d", resp.StatusCode)
 	}
 
@@ -192,7 +195,7 @@ func (c *Client) GetPhotoURI(ctx context.Context, id string, view string) (strin
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("on Get(): status = %d", resp.StatusCode)
 	}
 

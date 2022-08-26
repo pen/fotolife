@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/remeh/sizedwaitgroup"
+	"github.com/jesse0michael/errgroup"
 	"golang.org/x/net/context/ctxhttp"
 
 	"github.com/pen/fotolife/client"
@@ -47,7 +47,7 @@ func (d *Dump) Run(o *Options) error {
 	return d.processFolders(ctx, c, o)
 }
 
-func (d *Dump) processFolders(ctx context.Context, c *client.Client, o *Options) error {
+func (d *Dump) processFolders(ctx context.Context, c *client.Client, o *Options) error { //nolint:cyclop
 	folders, err := c.GetFolders(ctx, d.TargetID)
 	if err != nil {
 		return fmt.Errorf("on GetFolders(): %w", err)
@@ -80,6 +80,7 @@ func (d *Dump) processFolders(ctx context.Context, c *client.Client, o *Options)
 		views, err := c.GetViews(ctx, d.TargetID, folder, d.Para)
 		if err != nil {
 			o.Debugf("GetViews(%s): %v", folder, err)
+
 			continue
 		}
 
@@ -92,6 +93,7 @@ func (d *Dump) processFolders(ctx context.Context, c *client.Client, o *Options)
 		dir, err := d.makeDir(folder, o)
 		if err != nil {
 			o.Debugf("makeDir(%s): %v", folder, err)
+
 			continue
 		}
 
@@ -113,29 +115,29 @@ func (d *Dump) processViews(ctx context.Context, views []string, dir string, c *
 
 	o.Debugf("goroutines: %d", para)
 
-	swg := sizedwaitgroup.New(para)
+	eg, egCtx := errgroup.WithContext(ctx, para)
 
 	for _, view := range views {
-		swg.Add()
+		view := view
 
-		go func(v string) {
-			defer swg.Done()
-
-			uri, err := c.GetPhotoURI(ctx, d.TargetID, v)
+		eg.Go(func() error {
+			uri, err := c.GetPhotoURI(egCtx, d.TargetID, view)
 			if err != nil {
-				o.Debugf("failed to get uri of %s", v)
-				return
+				o.Debugf("failed to get uri of %s", view)
+
+				return fmt.Errorf("on GetPhotoURI(): %w", err)
 			}
 
-			err = d.download(ctx, http.DefaultClient, uri, dir, o)
+			err = d.download(egCtx, http.DefaultClient, uri, dir, o)
 			if err != nil {
 				o.Debugf("failed to download: %s %s", dir, uri)
-				return
-			}
-		}(view)
-	}
 
-	swg.Wait()
+				return err
+			}
+
+			return nil
+		})
+	}
 }
 
 func (d *Dump) makeDir(folder string, o *Options) (string, error) {
@@ -181,6 +183,7 @@ func (d *Dump) download(ctx context.Context, httpClient *http.Client, uri, dir s
 	if d.Update {
 		if d.canSkip(ctx, httpClient, uri, path) {
 			o.Debugf("skip: %s", path)
+
 			return nil
 		}
 	}

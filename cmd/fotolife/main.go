@@ -5,11 +5,11 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
-	
+
 	"github.com/pen/fotolife/internal/cmd"
 )
 
-var version = "0.5.7"
+var version = "0.6.0"
 
 func main() {
 	cli := cmd.CLI{

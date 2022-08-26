@@ -9,7 +9,8 @@ import (
 type Version struct{}
 
 func (Version) Run(vars kong.Vars) error {
-	fmt.Println(vars["version"])
+	fmt.Println(vars["version"]) //nolint:forbidigo
+
 	return nil
 }
 

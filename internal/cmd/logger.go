@@ -22,7 +22,6 @@ func (o *Options) Debugf(format string, v ...interface{}) {
 
 func (o *Options) Verbosef(format string, v ...interface{}) {
 	if o.Verbose {
-		fmt.Printf(format, v...)
-		fmt.Print("\n")
+		fmt.Printf(format+"\n", v...) //nolint: forbidigo
 	}
 }
