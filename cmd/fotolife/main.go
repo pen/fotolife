@@ -9,7 +9,7 @@ import (
 	"github.com/pen/fotolife/internal/cmd"
 )
 
-var version = "0.6.0"
+var version = "0.6.1"
 
 func main() {
 	cli := cmd.CLI{
